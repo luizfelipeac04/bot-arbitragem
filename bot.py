@@ -7,7 +7,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filte
 # === CONFIGURAÇÕES ===
 TELEGRAM_TOKEN = '7841837460:AAH_ImNJbNfbJZWy7MymGJ7fMiRTqdO9dM0'
 API_KEY = '39dd66405e32c31d2ae04fafe6b31579'
-REGION = 'us,eu,uk,au'
+REGION = 'all'
 SPORT = 'soccer'
 
 BOOKMAKERS = {
