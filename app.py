@@ -16,7 +16,7 @@ app_flask = Flask(__name__)
 
 @app_flask.route('/')
 def home():
-    return "🤖 Bot está online e rodando com sucesso!", 200
+    return "✅ Bot de Arbitragem está online!", 200
 
 
 # ==========================
@@ -24,15 +24,15 @@ def home():
 # ==========================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Bot de Arbitragem está online e funcionando!")
+    await update.message.reply_text("🤖 Bot de Arbitragem está online!")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ Bot rodando perfeitamente!")
+    await update.message.reply_text("✅ O bot está funcionando corretamente!")
 
 async def buscar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Buscando oportunidades de arbitragem (simulado)...")
+    await update.message.reply_text("🔍 Buscando arbitragem...")
     await asyncio.sleep(2)
-    await update.message.reply_text("💰 Arbitragem encontrada! Simulação concluída.")
+    await update.message.reply_text("💰 Arbitragem encontrada! (simulado)")
 
 # ==========================
 # FUNÇÃO PARA RODAR O BOT
@@ -54,7 +54,9 @@ async def main():
 # ==========================
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.create_task(main())
 
     port = int(os.environ.get('PORT', 8080))
     app_flask.run(host='0.0.0.0', port=port)
