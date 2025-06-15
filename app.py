@@ -1,12 +1,12 @@
 from flask import Flask, request
 from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, ContextTypes
-import asyncio
 import os
+import asyncio
 
 
 # ===============================
-# CONFIGURAÇÕES DO BOT
+# CONFIGURAÇÕES
 # ===============================
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -45,19 +45,20 @@ application.add_handler(CommandHandler("status", status))
 
 
 # ===============================
-# ROTA PARA O WEBHOOK
+# PROCESSAMENTO DO WEBHOOK
 # ===============================
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
 
-    async def process_update():
-        if not application.running:
-            await application.initialize()
-        await application.process_update(update)
+    loop = asyncio.get_event_loop()
 
-    asyncio.run(process_update())
+    if not application.running:
+        loop.run_until_complete(application.initialize())
+
+    loop.run_until_complete(application.process_update(update))
+
     return 'ok'
 
 
