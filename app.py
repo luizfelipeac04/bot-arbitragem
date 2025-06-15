@@ -8,7 +8,7 @@ import os
 # CONFIGURAÇÕES DO BOT
 # =========================
 TOKEN = os.environ.get('BOT_TOKEN')
-CHAT_ID = os.environ.get('CHAT_ID')  # Seu chat_id ou grupo que irá receber as mensagens
+CHAT_ID = os.environ.get('CHAT_ID')
 
 bot = telegram.Bot(token=TOKEN)
 
@@ -17,9 +17,6 @@ bot = telegram.Bot(token=TOKEN)
 # =========================
 app = Flask(__name__)
 
-# =========================
-# WEBHOOK – RECEBE COMANDOS DO TELEGRAM
-# =========================
 @app.route('/webhook', methods=['POST'])
 def webhook():
     update = telegram.Update.de_json(request.get_json(force=True), bot)
@@ -41,8 +38,6 @@ def webhook():
 def buscar_arbitragem():
     while True:
         try:
-            # 🔍 Aqui você adiciona a lógica real de busca de arbitragem
-            # Este é um exemplo fictício simulando uma arbitragem
             oportunidade = "🔥 Arbitragem encontrada no jogo TESTE FC vs DEMO FC 🤑"
 
             bot.send_message(chat_id=CHAT_ID, text=oportunidade)
@@ -52,7 +47,7 @@ def buscar_arbitragem():
         except Exception as e:
             print(f"❌ Erro na arbitragem: {e}")
 
-        time.sleep(60)  # Tempo entre cada busca (em segundos)
+        time.sleep(60)
 
 # =========================
 # THREAD PARA ARBITRAGEM
