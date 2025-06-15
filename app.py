@@ -3,16 +3,14 @@ import telegram
 import threading
 import time
 import os
-import requests
 
 # =========================
 # CONFIGURAÇÕES DO BOT
 # =========================
-TOKEN = 'SEU_TOKEN_DO_BOT_AQUI'
-bot = telegram.Bot(token=TOKEN)
+TOKEN = os.environ.get('BOT_TOKEN')
+CHAT_ID = os.environ.get('CHAT_ID')  # Seu chat_id ou grupo que irá receber as mensagens
 
-# 🔔 Coloque aqui o seu chat_id do Telegram para receber os alertas
-SEU_CHAT_ID = 'SEU_CHAT_ID_AQUI'
+bot = telegram.Bot(token=TOKEN)
 
 # =========================
 # INICIANDO O SERVIDOR FLASK
@@ -26,14 +24,14 @@ app = Flask(__name__)
 def webhook():
     update = telegram.Update.de_json(request.get_json(force=True), bot)
     chat_id = update.message.chat.id
-    text = update.message.text
+    text = update.message.text.lower()
 
     if text == '/start':
         bot.send_message(chat_id=chat_id, text="🤖 Bot de Arbitragem está online!")
     elif text == '/status':
-        bot.send_message(chat_id=chat_id, text="📈 Estou monitorando arbitragem agora!")
+        bot.send_message(chat_id=chat_id, text="📈 O bot está funcionando corretamente!")
     else:
-        bot.send_message(chat_id=chat_id, text=f"Você disse: {text}")
+        bot.send_message(chat_id=chat_id, text=f"❓ Comando não reconhecido: {text}")
 
     return 'ok'
 
@@ -43,28 +41,26 @@ def webhook():
 def buscar_arbitragem():
     while True:
         try:
-            # 🏟️ Aqui você colocaria sua lógica de busca de arbitragem
-            # ➕ Exemplo fictício:
-            oportunidades = ["Arbitragem encontrada no jogo XYZ 🤑"]
+            # 🔍 Aqui você adiciona a lógica real de busca de arbitragem
+            # Este é um exemplo fictício simulando uma arbitragem
+            oportunidade = "🔥 Arbitragem encontrada no jogo TESTE FC vs DEMO FC 🤑"
 
-            for oportunidade in oportunidades:
-                bot.send_message(chat_id=SEU_CHAT_ID, text=oportunidade)
+            bot.send_message(chat_id=CHAT_ID, text=oportunidade)
 
-            print("✅ Buscando arbitragem...")
+            print("✅ Arbitragem enviada com sucesso.")
 
         except Exception as e:
             print(f"❌ Erro na arbitragem: {e}")
 
-        time.sleep(60)  # A cada 60 segundos faz nova busca
-
+        time.sleep(60)  # Tempo entre cada busca (em segundos)
 
 # =========================
 # THREAD PARA ARBITRAGEM
 # =========================
 def iniciar_arb_thread():
     thread = threading.Thread(target=buscar_arbitragem)
+    thread.daemon = True
     thread.start()
-
 
 # =========================
 # INICIALIZAÇÃO
