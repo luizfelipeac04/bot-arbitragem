@@ -1,9 +1,8 @@
-from flask import Flask, request
-from telegram import Bot, Update
+from flask import Flask
+from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
-import asyncio
-import threading
 import os
+import asyncio
 
 
 # ==============================
@@ -17,7 +16,11 @@ CHAT_ID = os.environ.get('CHAT_ID')
 # INICIALIZANDO O FLASK
 # ==============================
 
-app = Flask(__name__)
+app_flask = Flask(__name__)
+
+@app_flask.route('/')
+def home():
+    return '🤖 Bot de Arbitragem está rodando com sucesso!', 200
 
 
 # ==============================
@@ -25,50 +28,39 @@ app = Flask(__name__)
 # ==============================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Bot de Arbitragem está online!")
+    await update.message.reply_text("🤖 Bot de Arbitragem está online e operando!")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ O bot está funcionando corretamente!")
 
-async def buscar_arbitragem(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔎 Buscando oportunidades de arbitragem...")
-
-# ==============================
-# WEBHOOK FLASK
-# ==============================
-
-@app.route('/')
-def webhook():
-    return 'Bot de Arbitragem está rodando!', 200
+async def buscar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Buscando oportunidades de arbitragem (simulado)...")
+    await asyncio.sleep(2)
+    await update.message.reply_text("💰 Arbitragem encontrada! (exemplo)")
 
 
 # ==============================
 # FUNÇÃO PARA INICIAR O BOT
 # ==============================
 
-def iniciar_bot():
+async def rodar_bot():
     app_bot = Application.builder().token(TOKEN).build()
 
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(CommandHandler("status", status))
-    app_bot.add_handler(CommandHandler("buscar", buscar_arbitragem))
+    app_bot.add_handler(CommandHandler("buscar", buscar))
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(app_bot.run_polling())
+    print("🚀 Bot iniciado com sucesso!")
+    await app_bot.run_polling()
 
-# ==============================
-# THREAD PARA EXECUTAR O BOT
-# ==============================
-
-def iniciar_thread_bot():
-    bot_thread = threading.Thread(target=iniciar_bot)
-    bot_thread.start()
 
 # ==============================
-# EXECUTANDO O FLASK + BOT
+# INICIALIZAÇÃO GERAL
 # ==============================
 
 if __name__ == '__main__':
-    iniciar_thread_bot()
-    app.run(host='0.0.0.0', port=8080)
+    loop = asyncio.get_event_loop()
+    loop.create_task(rodar_bot())
+
+    port = int(os.environ.get('PORT', 8080))
+    app_flask.run(host='0.0.0.0', port=port)
