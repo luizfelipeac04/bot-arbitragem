@@ -4,6 +4,10 @@ import os
 import asyncio
 import time
 import requests
+import nest_asyncio # Importar nest_asyncio
+
+# Aplicar nest_asyncio para permitir aninhar loops de eventos
+nest_asyncio.apply()
 
 # ===============================
 # CONFIGURAÇÕES DO BOT
@@ -184,7 +188,6 @@ async def run_bot():
     await application.run_polling(poll_interval=1.0) 
 
 if __name__ == '__main__':
-    # Esta é a forma correta de iniciar um corrotina (`async def`)
-    # em um script Python que pode ser executado em um ambiente como o Railway.
-    # Ele garante que o loop de eventos seja iniciado e gerenciado corretamente.
-    asyncio.run(run_bot()) # Correção aplicada aqui
+    # A chamada direta da função assíncrona com nest_asyncio aplicado
+    # deve resolver o problema do loop de eventos.
+    asyncio.run(run_bot())
