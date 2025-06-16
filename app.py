@@ -4,10 +4,8 @@ import os
 import asyncio
 import time
 import requests
-import nest_asyncio
-
-# Aplicar nest_asyncio para permitir aninhar loops de eventos
-nest_asyncio.apply()
+# Remover nest_asyncio, pois não é necessário com Webhook
+# import nest_asyncio 
 
 # ===============================
 # CONFIGURAÇÕES DO BOT
@@ -20,9 +18,7 @@ REGION = 'us,eu,uk,au'
 MARKETS = 'h2h' 
 BOOKMAKERS_LIMIT = 5 
 MIN_PROFIT_PERCENT = 1.0 
-
-# ATUALIZAÇÃO AQUI: Intervalo da busca automática para 30 minutos (1800 segundos)
-SEARCH_INTERVAL_SECONDS = 1800 
+SEARCH_INTERVAL_SECONDS = 1800 # 30 minutos
 
 BOOKMAKERS_LINKS = {
     'Bet365': 'https://www.bet365.com/',
@@ -53,6 +49,14 @@ BOOKMAKERS_LINKS = {
 }
 
 alerted_opportunities = set()
+
+# IMPORTAR FLASK AQUI
+from flask import Flask, request
+
+# ===============================
+# CONFIGURAÇÃO DO FLASK
+# ===============================
+app = Flask(__name__)
 
 # ===============================
 # FUNÇÕES DE CÁLCULO DE ARBITRAGEM
@@ -98,13 +102,20 @@ def format_arbitrage_message(game, best_odds_info, profit_percent):
     return message
 
 # ===============================
-# FUNÇÕES DO BOT TELEGRAM
+# FUNÇÕES DO BOT TELEGRAM (para Webhook)
 # ===============================
+# A aplicação do bot será global para ser acessível pelo webhook
+application = Application.builder().token(TOKEN).build()
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🚀 Bot de Arbitragem está ONLINE e buscando oportunidades automaticamente! Use /status para checar.")
+    await update.message.reply_text("🚀 Bot de Arbitragem está ONLINE via Webhook e buscando oportunidades automaticamente! Use /status para checar.")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ O bot está funcionando corretamente e buscando oportunidades a cada {SEARCH_INTERVAL_SECONDS / 60:.0f} minutos.")
+
+# Registra os handlers no aplicativo global
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("status", status))
 
 # ===============================
 # LÓGICA PRINCIPAL DE BUSCA DE ARBITRAGEM (AUTOMÁTICA)
@@ -177,20 +188,53 @@ async def find_and_alert_arbitrage_loop(app_bot: Application):
         await asyncio.sleep(SEARCH_INTERVAL_SECONDS) 
 
 # ===============================
-# INICIALIZANDO O BOT (Polling)
+# ROTA PARA O WEBHOOK
 # ===============================
-async def run_bot():
-    """Função assíncrona principal para rodar o bot."""
-    application = Application.builder().token(TOKEN).build()
+@app.route('/webhook', methods=['POST'])
+async def webhook():
+    if request.method == "POST":
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        
+        # O process_update precisa ser chamado dentro de um loop de eventos já existente.
+        # Como o Flask já tem seu próprio loop, não podemos usar asyncio.run() aqui.
+        # Usamos application.update_queue.put() para colocar a atualização na fila e ser processada pelo application.run_webhook()
+        # Mas para simplificar, vamos garantir que o application.process_update(update) seja chamado no contexto correto.
+        await application.process_update(update)
+        
+        return "ok"
+    return "Webhook running!"
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("status", status))
+# ===============================
+# ROTA DE TESTE (Homepage do Railway)
+# ===============================
+@app.route('/')
+def home():
+    return "🚀 Bot de Arbitragem está rodando com Webhook no Railway!"
+
+# ===============================
+# INICIANDO O APP (Webhook)
+# ===============================
+async def run_webhook_bot():
+    """Função principal para iniciar o bot e o servidor Flask."""
     
-    print("🚀 Bot rodando via Polling no Railway!")
-    
+    # Inicia o loop de busca de arbitragem em uma tarefa assíncrona separada.
+    # Essa tarefa será executada em paralelo com o servidor Flask.
     asyncio.create_task(find_and_alert_arbitrage_loop(application))
     
-    await application.run_polling(poll_interval=1.0) 
+    # Inicia o servidor Flask. 
+    # O run_webhook() é o método ideal para ambientes de produção com Webhook.
+    # Ele gerencia o servidor Flask e o processamento de updates do Telegram.
+    print("🚀 Bot rodando via Webhook no Railway! Servidor Flask ativo.")
+    await application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 8080)),
+        url_path="/webhook",
+        webhook_url=f"https://{os.environ.get('RAILWAY_STATIC_URL', 'your-railway-domain.up.railway.app')}/webhook"
+        # RAILWAY_STATIC_URL é uma variável de ambiente fornecida pelo Railway
+        # que contém o domínio público do seu serviço.
+    )
 
 if __name__ == '__main__':
-    asyncio.run(run_bot())
+    # Usamos asyncio.run() para iniciar a função assíncrona principal.
+    # Isso resolve os problemas de loop de eventos anteriores.
+    asyncio.run(run_webhook_bot())
