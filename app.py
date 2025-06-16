@@ -4,7 +4,7 @@ import os
 import asyncio
 import time
 import requests
-import nest_asyncio # Importar nest_asyncio
+import nest_asyncio
 
 # Aplicar nest_asyncio para permitir aninhar loops de eventos
 nest_asyncio.apply()
@@ -15,12 +15,14 @@ nest_asyncio.apply()
 TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 API_KEY = os.getenv("ODDS_API_KEY") 
-SPORT = 'soccer' 
-REGION = 'all' 
+SPORT = 'soccer,tennis,basketball,americanfootball,baseball' 
+REGION = 'us,eu,uk,au' 
 MARKETS = 'h2h' 
 BOOKMAKERS_LIMIT = 5 
 MIN_PROFIT_PERCENT = 1.0 
-SEARCH_INTERVAL_SECONDS = 120 
+
+# ATUALIZAÇÃO AQUI: Intervalo da busca automática para 30 minutos (1800 segundos)
+SEARCH_INTERVAL_SECONDS = 1800 
 
 BOOKMAKERS_LINKS = {
     'Bet365': 'https://www.bet365.com/',
@@ -67,10 +69,13 @@ def format_arbitrage_message(game, best_odds_info, profit_percent):
     away_team = game['away_team']
     commence_time_str = game['commence_time'].replace('T', ' ').replace('Z', '')[:16]
 
+    sport_name = game.get('sport_title', 'Esporte Desconhecido') 
+
     message = (
         f"💰 *Arbitragem Encontrada!* \n\n"
         f"⚽️ *Jogo:* {home_team} vs {away_team}\n"
         f"📅 *Data:* {commence_time_str}\n"
+        f"🏆 *Esporte:* {sport_name}\n" 
         f"📈 *Lucro Garantido:* {profit_percent:.2f}%\n\n"
         f"🔹 *Onde Apostar:*\n"
     )
@@ -99,7 +104,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🚀 Bot de Arbitragem está ONLINE e buscando oportunidades automaticamente! Use /status para checar.")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ O bot está funcionando corretamente e buscando oportunidades a cada 2 minutos.")
+    await update.message.reply_text(f"✅ O bot está funcionando corretamente e buscando oportunidades a cada {SEARCH_INTERVAL_SECONDS / 60:.0f} minutos.")
 
 # ===============================
 # LÓGICA PRINCIPAL DE BUSCA DE ARBITRAGEM (AUTOMÁTICA)
@@ -188,6 +193,4 @@ async def run_bot():
     await application.run_polling(poll_interval=1.0) 
 
 if __name__ == '__main__':
-    # A chamada direta da função assíncrona com nest_asyncio aplicado
-    # deve resolver o problema do loop de eventos.
     asyncio.run(run_bot())
