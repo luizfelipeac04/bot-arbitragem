@@ -11,7 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler # Importar APS
 # ===============================
 TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-API_KEY = os.getenv("ODDS_API_KEY") # Não usado na simulação
+API_KEY = os.getenv("ODDS_API_KEY") 
 
 SPORT = 'soccer'
 REGION = 'us,eu,uk,au'
