@@ -1,25 +1,25 @@
-from flask import Flask, request # Importar Flask para o Webhook
-from telegram import Bot, Update # Importar Bot e Update
-from telegram.ext import Application, CommandHandler, ContextTypes # Importar Application, CommandHandler, ContextTypes
-import os # Para acessar variáveis de ambiente
-import asyncio # Para tarefas assíncronas
-import time # Para simular delay e timestamps
+from flask import Flask, request
+from telegram import Bot, Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+import os
+import asyncio
+import time
+import threading # Será necessário para rodar o Flask em uma thread separada se a aplicação principal for o bot
 
 # ===============================
 # CONFIGURAÇÕES DO BOT
 # ===============================
-TOKEN = os.getenv("BOT_TOKEN") # Token do bot do Telegram
-CHAT_ID = os.getenv("CHAT_ID") # ID do chat para enviar alertas
-API_KEY = os.getenv("ODDS_API_KEY") # Chave da The Odds API (não usada na simulação)
+TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+API_KEY = os.getenv("ODDS_API_KEY") # Não usado na simulação
 
-SPORT = 'soccer' # Esporte para simulação e futura integração real
-REGION = 'us,eu,uk,au' # Regiões (não usada na simulação)
-MARKETS = 'h2h' # Mercado (não usado na simulação)
-BOOKMAKERS_LIMIT = 5 # Limite de casas (não usado na simulação)
-MIN_PROFIT_PERCENT = 1.0 # Lucro mínimo para alerta (usado na simulação)
-SEARCH_INTERVAL_SECONDS = 1800 # Intervalo da busca automática (30 minutos)
+SPORT = 'soccer'
+REGION = 'us,eu,uk,au'
+MARKETS = 'h2h'
+BOOKMAKERS_LIMIT = 5
+MIN_PROFIT_PERCENT = 1.0
+SEARCH_INTERVAL_SECONDS = 1800 # 30 minutos
 
-# Dicionário de casas de apostas com links (para mensagens bonitas)
 BOOKMAKERS_LINKS = {
     'Bet365': 'https://www.bet365.com/',
     'Betfair': 'https://www.betfair.com/',
@@ -48,7 +48,7 @@ BOOKMAKERS_LINKS = {
     'KTO': 'https://www.kto.com/',
 }
 
-alerted_opportunities = set() # Cache para evitar alertas repetidos
+alerted_opportunities = set()
 
 # Instância global do Bot e Application
 bot = Bot(token=TOKEN)
@@ -67,7 +67,7 @@ def calculate_arbitrage_profit(odds):
 def format_arbitrage_message(game, best_odds_info, profit_percent):
     home_team = game['home_team']
     away_team = game['away_team']
-    commence_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) # Usar hora atual para simulação
+    commence_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
 
     sport_name = game.get('sport_title', 'Futebol (Simulado)') 
 
@@ -97,7 +97,7 @@ def format_arbitrage_message(game, best_odds_info, profit_percent):
     return message
 
 # ===============================
-# FUNÇÕES DO BOT TELEGRAM (para Webhook)
+# FUNÇÕES DO BOT TELEGRAM
 # ===============================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🚀 Bot de Arbitragem (Simulação) está ONLINE via Webhook e buscando oportunidades automaticamente! Use /status para checar.")
@@ -159,7 +159,6 @@ async def find_and_alert_arbitrage_loop_simulated():
 # ===============================
 # ROTAS DO FLASK PARA O WEBHOOK E TESTE
 # ===============================
-# Instância do Flask para o Webhook
 app_flask = Flask(__name__)
 
 @app_flask.route('/webhook', methods=['POST'])
@@ -177,10 +176,14 @@ def home():
     return "🚀 Bot de Arbitragem está rodando com Webhook no Railway! Servidor Flask OK."
 
 # ===============================
-# INICIALIZAÇÃO PRINCIPAL DO SERVIDOR E BOT
+# INICIALIZAÇÃO PRINCIPAL DO SERVIDOR E BOT (THREADING PARA FLASK)
 # ===============================
-async def main():
-    """Inicializa o servidor Flask e a busca de arbitragem."""
+# A função para rodar o Flask em uma thread separada
+def run_flask_app():
+    app_flask.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
+async def main_bot_logic():
+    """Contém a lógica principal do bot e inicia as tarefas assíncronas."""
     
     # Inicia os handlers do bot
     application.add_handler(CommandHandler("start", start))
@@ -189,18 +192,8 @@ async def main():
     # Inicia a busca de arbitragem simulada em uma tarefa assíncrona em background
     asyncio.create_task(find_and_alert_arbitrage_loop_simulated())
     
-    # Inicia a aplicação do Telegram (necessário para o processamento do webhook)
-    await application.initialize()
-
-    # Inicia o servidor Flask para escutar o webhook
-    print("🚀 Bot de Arbitragem (SIMULAÇÃO) rodando via Webhook no Railway! Servidor Flask ativo.")
-    # flask_run_args = {
-    #     "host": "0.0.0.0",
-    #     "port": int(os.environ.get("PORT", 8080))
-    # }
-    # await app_flask.run(**flask_run_args)
-    # A função abaixo irá iniciar o servidor web e o loop de eventos para o bot
-    # conforme a documentação do python-telegram-bot
+    # Inicia a aplicação do Telegram para processar os updates via webhook
+    # Esta é a parte que espera pelas requisições do Telegram
     await application.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 8080)),
@@ -208,5 +201,15 @@ async def main():
     )
 
 if __name__ == '__main__':
-    # Esta é a forma correta de iniciar a aplicação assíncrona principal.
-    asyncio.run(main())
+    print("🚀 Iniciando aplicação Railway...")
+    
+    # Cria e inicia uma thread separada para rodar o Flask.
+    # Isso permite que o loop de eventos do asyncio (para o bot)
+    # rode na thread principal sem conflito.
+    flask_thread = threading.Thread(target=run_flask_app)
+    flask_thread.daemon = True # Define como daemon para que a thread termine com o programa principal
+    flask_thread.start()
+
+    # Inicia o loop de eventos do asyncio para a lógica do bot e o run_webhook.
+    # Esta linha agora é a principal execução assíncrona.
+    asyncio.run(main_bot_logic())
