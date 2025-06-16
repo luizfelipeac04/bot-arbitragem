@@ -4,7 +4,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 import os
 import asyncio
 import time
-from apscheduler.schedulers.background import BackgroundScheduler # Importar APScheduler
+from apscheduler.schedulers.background import BackgroundScheduler 
 
 # ===============================
 # CONFIGURAÇÕES DO BOT
@@ -18,7 +18,7 @@ REGION = 'us,eu,uk,au'
 MARKETS = 'h2h'
 BOOKMAKERS_LIMIT = 5
 MIN_PROFIT_PERCENT = 1.0
-SEARCH_INTERVAL_SECONDS = 1800 # 30 minutos
+SEARCH_INTERVAL_SECONDS = 1800 
 
 BOOKMAKERS_LINKS = {
     'Bet365': 'https://www.bet365.com/',
@@ -198,9 +198,9 @@ if __name__ == '__main__':
     # Inicia o servidor Flask usando application.run_webhook.
     # Este método é o ponto de entrada principal e gerencia o loop de eventos para o bot.
     # Ele também mantém o servidor Flask rodando para receber webhooks.
+    # O webhook_url não é passado aqui, ele deve ser configurado manualmente uma vez.
     application.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 8080)),
         url_path="/webhook"
-        # Não passamos webhook_url aqui, pois ele será configurado uma vez via API do Telegram.
     )
