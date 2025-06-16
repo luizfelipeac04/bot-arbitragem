@@ -17,8 +17,7 @@ REGION = 'us,eu,uk,au'
 MARKETS = 'h2h' 
 BOOKMAKERS_LIMIT = 5 
 MIN_PROFIT_PERCENT = 1.0 
-# Este SEARCH_INTERVAL_SECONDS não será usado para loop automático, apenas para simulação interna
-SEARCH_INTERVAL_SECONDS = 120 # 2 minutos para a simulação, mas sem loop automático por enquanto
+SEARCH_INTERVAL_SECONDS = 120 # Manter para simulação interna, sem loop automático
 
 BOOKMAKERS_LINKS = {
     'Bet365': 'https://www.bet365.com/',
@@ -48,6 +47,10 @@ BOOKMAKERS_LINKS = {
 }
 
 alerted_opportunities = set()
+
+# Instância global do Bot e Application
+# Não inicializamos aqui, a inicialização será feita dentro de run_bot_polling_main_simple()
+application = None 
 
 # ===============================
 # FUNÇÕES DE CÁLCULO DE ARBITRAGEM
@@ -138,21 +141,25 @@ async def buscar_simulado(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===============================
 # INICIALIZAÇÃO PRINCIPAL (Polling)
 # ===============================
-async def run_bot_polling_main():
-    """Função principal para rodar o bot."""
-    application = Application.builder().token(TOKEN).build()
+def run_bot_polling_main_simple():
+    """Função principal que configura e roda o bot."""
+    global application # Acessa a variável global application
+    application = Application.builder().token(TOKEN).build() # Inicializa o Application aqui
 
     # Adiciona os handlers para os comandos
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
-    application.add_handler(CommandHandler("buscar_simulado", buscar_simulado)) # Comando para simulação
+    application.add_handler(CommandHandler("buscar_simulado", buscar_simulado)) 
     
-    print("🚀 Bot rodando via Polling no Railway (versão estável inicial)!")
+    print("🚀 Bot rodando via Polling no Railway (versão estável inicial - SIMPLIFICADA)!")
     
-    # Inicia o modo polling (o bot escuta por atualizações do Telegram)
-    await application.run_polling(poll_interval=1.0) 
+    # Inicia o modo polling. Este método é bloqueante e gerencia
+    # o loop de eventos principal para o bot.
+    # O Railway deve conseguir executar isso como o processo principal.
+    application.run_polling(poll_interval=1.0) 
 
 if __name__ == '__main__':
-    # Usamos asyncio.run() para iniciar a função assíncrona principal.
-    # Isso resolve os problemas de loop de eventos que tivemos no início com Polling.
-    asyncio.run(run_bot_polling_main())
+    # Chamada direta da função principal.
+    # Sem asyncio.run() explícito, sem threads, sem APScheduler.
+    # Deixa o Railway rodar esta função como o processo principal.
+    run_bot_polling_main_simple()
