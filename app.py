@@ -4,7 +4,6 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 import os
 import asyncio
 import time
-import threading # Será necessário para rodar o Flask em uma thread separada se a aplicação principal for o bot
 
 # ===============================
 # CONFIGURAÇÕES DO BOT
@@ -50,7 +49,7 @@ BOOKMAKERS_LINKS = {
 
 alerted_opportunities = set()
 
-# Instância global do Bot e Application
+# Instância global do Bot e Application (sem inicializar aqui)
 bot = Bot(token=TOKEN)
 application = Application.builder().token(TOKEN).build()
 
@@ -176,40 +175,29 @@ def home():
     return "🚀 Bot de Arbitragem está rodando com Webhook no Railway! Servidor Flask OK."
 
 # ===============================
-# INICIALIZAÇÃO PRINCIPAL DO SERVIDOR E BOT (THREADING PARA FLASK)
-# ===============================
-# A função para rodar o Flask em uma thread separada
-def run_flask_app():
-    app_flask.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+# PONTO DE ENTRADA PRINCIPAL PARA O RAILWAY
+# = =============================
+# Handlers do bot (registrados uma vez na inicialização)
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("status", status))
 
-async def main_bot_logic():
-    """Contém a lógica principal do bot e inicia as tarefas assíncronas."""
-    
-    # Inicia os handlers do bot
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("status", status))
+# Inicia a busca de arbitragem simulada em uma tarefa assíncrona em background
+# Isso deve ser feito assim que o loop de eventos principal estiver rodando
+asyncio.create_task(find_and_alert_arbitrage_loop_simulated())
 
-    # Inicia a busca de arbitragem simulada em uma tarefa assíncrona em background
-    asyncio.create_task(find_and_alert_arbitrage_loop_simulated())
-    
-    # Inicia a aplicação do Telegram para processar os updates via webhook
-    # Esta é a parte que espera pelas requisições do Telegram
-    await application.run_webhook(
+# Ponto de entrada que o Railway espera para uma aplicação Flask/Webhook
+# Esta é a forma mais direta de rodar o Flask e o bot juntos no Railway
+if __name__ == '__main__':
+    print("🚀 Iniciando aplicação Railway (Webhook) FINAL...")
+    # Inicializa a aplicação do Telegram para processar os updates via webhook
+    # Esta linha é crucial para o run_webhook funcionar
+    asyncio.get_event_loop().run_until_complete(application.initialize())
+
+    # Inicia o servidor Flask para escutar o webhook
+    # application.run_webhook já gerencia o Flask e o loop de eventos do bot
+    # Isso é o ponto de entrada principal e bloqueante.
+    application.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 8080)),
         url_path="/webhook"
     )
-
-if __name__ == '__main__':
-    print("🚀 Iniciando aplicação Railway...")
-    
-    # Cria e inicia uma thread separada para rodar o Flask.
-    # Isso permite que o loop de eventos do asyncio (para o bot)
-    # rode na thread principal sem conflito.
-    flask_thread = threading.Thread(target=run_flask_app)
-    flask_thread.daemon = True # Define como daemon para que a thread termine com o programa principal
-    flask_thread.start()
-
-    # Inicia o loop de eventos do asyncio para a lógica do bot e o run_webhook.
-    # Esta linha agora é a principal execução assíncrona.
-    asyncio.run(main_bot_logic())
