@@ -10,15 +10,14 @@ import requests
 # ===============================
 TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-API_KEY = os.getenv("ODDS_API_KEY") # Chave da The Odds API
-SPORT = 'soccer' # Esporte que vamos monitorar
-REGION = 'all' # Regiões das odds (todas disponíveis)
-MARKETS = 'h2h' # Mercados (head-to-head = 1x2)
-BOOKMAKERS_LIMIT = 5 # Comparar odds entre até N casas por evento
-MIN_PROFIT_PERCENT = 1.0 # Filtrar por lucro mínimo de 1%
-SEARCH_INTERVAL_SECONDS = 120 # Intervalo da busca automática: 2 minutos
+API_KEY = os.getenv("ODDS_API_KEY") 
+SPORT = 'soccer' 
+REGION = 'all' 
+MARKETS = 'h2h' 
+BOOKMAKERS_LIMIT = 5 
+MIN_PROFIT_PERCENT = 1.0 
+SEARCH_INTERVAL_SECONDS = 120 
 
-# Dicionário de casas de apostas com links (para mensagens bonitas)
 BOOKMAKERS_LINKS = {
     'Bet365': 'https://www.bet365.com/',
     'Betfair': 'https://www.betfair.com/',
@@ -47,14 +46,12 @@ BOOKMAKERS_LINKS = {
     'KTO': 'https://www.kto.com/',
 }
 
-# Cache para evitar enviar alertas repetidos para o mesmo jogo
 alerted_opportunities = set()
 
 # ===============================
 # FUNÇÕES DE CÁLCULO DE ARBITRAGEM
 # ===============================
 def calculate_arbitrage_profit(odds):
-    """Calcula a porcentagem de lucro de arbitragem."""
     inverse_sum = sum(1 / odd for odd in odds)
     if inverse_sum < 1:
         profit_percent = (1 - inverse_sum) * 100
@@ -62,10 +59,9 @@ def calculate_arbitrage_profit(odds):
     return 0
 
 def format_arbitrage_message(game, best_odds_info, profit_percent):
-    """Formata a mensagem de alerta de arbitragem para o Telegram."""
     home_team = game['home_team']
     away_team = game['away_team']
-    commence_time_str = game['commence_time'].replace('T', ' ').replace('Z', '')[:16] # Formata a data/hora
+    commence_time_str = game['commence_time'].replace('T', ' ').replace('Z', '')[:16]
 
     message = (
         f"💰 *Arbitragem Encontrada!* \n\n"
@@ -96,35 +92,28 @@ def format_arbitrage_message(game, best_odds_info, profit_percent):
 # FUNÇÕES DO BOT TELEGRAM
 # ===============================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Responde ao comando /start."""
     await update.message.reply_text("🚀 Bot de Arbitragem está ONLINE e buscando oportunidades automaticamente! Use /status para checar.")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Verifica o status do bot."""
     await update.message.reply_text("✅ O bot está funcionando corretamente e buscando oportunidades a cada 2 minutos.")
 
 # ===============================
 # LÓGICA PRINCIPAL DE BUSCA DE ARBITRAGEM (AUTOMÁTICA)
 # ===============================
 async def find_and_alert_arbitrage_loop(app_bot: Application):
-    """
-    Loop contínuo para buscar por oportunidades de arbitragem e enviar alertas.
-    """
     while True:
-        print(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')} - Seu bot está procurando oportunidades, aguarde...") # Mensagem no log
+        print(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')} - Seu bot está procurando oportunidades, aguarde...") 
         try:
             url = f"https://api.the-odds-api.com/v4/sports/{SPORT}/odds/?apiKey={API_KEY}&regions={REGION}&markets={MARKETS}&oddsFormat=decimal"
             
             response = requests.get(url)
-            response.raise_for_status() # Lança um erro para status de resposta HTTP ruins (4xx ou 5xx)
+            response.raise_for_status() 
             data = response.json()
             
             print(f"🎯 Analisando {len(data)} jogos para arbitragem...")
 
             if not data:
                 print("Nenhum jogo encontrado ou API retornou vazio.")
-                # Opcional: enviar um aviso ao CHAT_ID se nenhum jogo for encontrado após X tentativas
-                # await app_bot.bot.send_message(chat_id=CHAT_ID, text="ℹ️ Nenhuma oportunidade encontrada na última verificação. Continuarei monitorando.")
                 
             for game in data:
                 game_id_unique = f"{game['id']}-{game['commence_time']}"
@@ -176,26 +165,24 @@ async def find_and_alert_arbitrage_loop(app_bot: Application):
         except Exception as e:
             print(f"❌ Erro inesperado na busca de arbitragem: {e}")
         
-        await asyncio.sleep(SEARCH_INTERVAL_SECONDS) # Espera 2 minutos antes da próxima busca
+        await asyncio.sleep(SEARCH_INTERVAL_SECONDS) 
 
 # ===============================
 # INICIALIZANDO O BOT (Polling)
 # ===============================
-async def main():
-    """Inicia o bot e o modo polling."""
+async def main_bot_runner():
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
-    # Não precisamos mais do comando /buscar_arbitragem, pois a busca é automática
     
     print("🚀 Bot rodando via Polling no Railway!")
     
-    # Inicia o loop de busca de arbitragem em uma tarefa assíncrona separada
     asyncio.create_task(find_and_alert_arbitrage_loop(application))
     
-    # Inicia o modo polling do Telegram (para que o bot receba comandos)
-    application.run_polling(poll_interval=1.0) # Responde comandos mais rápido (a cada 1 segundo)
+    await application.run_polling(poll_interval=1.0) 
 
 if __name__ == '__main__':
-    asyncio.run(main()) # Garante que o loop asyncio seja iniciado corretamente
+    # O Railway já inicia um loop de eventos principal para o processo.
+    # Chamamos a função diretamente para que ela rode dentro desse loop.
+    asyncio.run(main_bot_runner()) # Correção aplicada aqui
