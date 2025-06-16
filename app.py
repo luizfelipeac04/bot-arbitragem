@@ -170,7 +170,8 @@ async def find_and_alert_arbitrage_loop(app_bot: Application):
 # ===============================
 # INICIALIZANDO O BOT (Polling)
 # ===============================
-async def main():
+async def run_bot():
+    """Função assíncrona principal para rodar o bot."""
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
@@ -183,6 +184,7 @@ async def main():
     await application.run_polling(poll_interval=1.0) 
 
 if __name__ == '__main__':
-    # Aqui é a correção final: não usamos asyncio.run() fora de uma função assíncrona,
-    # apenas chamamos a função principal diretamente. O Railway se encarrega do loop de eventos.
-    main()
+    # Esta é a forma correta de iniciar um corrotina (`async def`)
+    # em um script Python que pode ser executado em um ambiente como o Railway.
+    # Ele garante que o loop de eventos seja iniciado e gerenciado corretamente.
+    asyncio.run(run_bot()) # Correção aplicada aqui
