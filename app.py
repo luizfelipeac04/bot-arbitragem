@@ -2,45 +2,197 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import os
 import asyncio
-import time # Importar time para simulação de delay
+import time
+import requests
 
 # ===============================
 # CONFIGURAÇÕES DO BOT
 # ===============================
 TOKEN = os.getenv("BOT_TOKEN")
-# CHAT_ID não é estritamente necessário aqui, pois a resposta é para o chat_id do update
-# mas é bom manter para referência ou se for enviar mensagens proativas
-CHAT_ID = os.getenv("CHAT_ID") 
+CHAT_ID = os.getenv("CHAT_ID")
+API_KEY = os.getenv("ODDS_API_KEY") # Chave da The Odds API
+SPORT = 'soccer' # Esporte que vamos monitorar
+REGION = 'all' # Regiões das odds (todas disponíveis)
+MARKETS = 'h2h' # Mercados (head-to-head = 1x2)
+BOOKMAKERS_LIMIT = 5 # Comparar odds entre até N casas por evento
+MIN_PROFIT_PERCENT = 1.0 # Filtrar por lucro mínimo de 1%
+
+# Dicionário de casas de apostas com links (para mensagens bonitas)
+BOOKMAKERS_LINKS = {
+    'Bet365': 'https://www.bet365.com/',
+    'Betfair': 'https://www.betfair.com/',
+    'Pinnacle': 'https://www.pinnacle.com/',
+    'Unibet': 'https://www.unibet.com/',
+    'Matchbook': 'https://www.matchbook.com/',
+    'Betano': 'https://www.betano.com/',
+    '1xBet': 'https://1xbet.com/',
+    'Sportingbet': 'https://www.sportingbet.com/',
+    'Bodog': 'https://www.bodog.com/',
+    'Betway': 'https://www.betway.com/',
+    'Rivalo': 'https://www.rivalo.com/',
+    'LeoVegas': 'https://www.leovegas.com/',
+    '888sport': 'https://www.888sport.com/',
+    'Mr Green': 'https://www.mrgreen.com/',
+    'Betfred': 'https://www.betfred.com/',
+    'Parimatch': 'https://www.parimatch.com/',
+    'Coolbet': 'https://www.coolbet.com/',
+    'DraftKings': 'https://www.draftkings.com/',
+    'FanDuel': 'https://www.fanduel.com/',
+    'Bwin': 'https://www.bwin.com/',
+    'William Hill': 'https://www.williamhill.com/',
+    'Marathonbet': 'https://www.marathonbet.com/',
+    '10bet': 'https://www.10bet.com/',
+    'Betcris': 'https://www.betcris.com/',
+    'KTO': 'https://www.kto.com/',
+}
+
+# Cache para evitar enviar alertas repetidos para o mesmo jogo
+# Usaremos 'game_id' + 'commence_time' como chave única
+alerted_opportunities = set()
 
 # ===============================
-# FUNÇÕES DO BOT
+# FUNÇÕES DE CÁLCULO DE ARBITRAGEM
+# ===============================
+def calculate_arbitrage_profit(odds):
+    """Calcula a porcentagem de lucro de arbitragem."""
+    # odds é uma lista de odds para cada resultado (ex: [odd_casa, odd_empate, odd_fora])
+    inverse_sum = sum(1 / odd for odd in odds)
+    if inverse_sum < 1:
+        profit_percent = (1 - inverse_sum) * 100
+        return profit_percent
+    return 0
+
+def format_arbitrage_message(game, best_odds_info, profit_percent):
+    """Formata a mensagem de alerta de arbitragem para o Telegram."""
+    home_team = game['home_team']
+    away_team = game['away_team']
+    commence_time_str = game['commence_time'].replace('T', ' ').replace('Z', '')[:16] # Formata a data/hora
+
+    message = (
+        f"💰 *Arbitragem Encontrada!* \n\n"
+        f"⚽️ *Jogo:* {home_team} vs {away_team}\n"
+        f"📅 *Data:* {commence_time_str}\n"
+        f"📈 *Lucro Garantido:* {profit_percent:.2f}%\n\n"
+        f"🔹 *Onde Apostar:*\n"
+    )
+
+    # Adiciona as informações de cada resultado
+    for outcome_name, odd_data in best_odds_info.items():
+        odd = odd_data['odd']
+        bookmaker = odd_data['bookmaker']
+        link = BOOKMAKERS_LINKS.get(bookmaker, f"https://www.google.com/search?q={bookmaker}")
+        
+        label = outcome_name # 'home', 'draw', 'away'
+        if outcome_name == 'home':
+            label = '🏠 Mandante'
+        elif outcome_name == 'draw':
+            label = '🤝 Empate'
+        elif outcome_name == 'away':
+            label = '🏃 Visitante'
+            
+        message += f"{label}: *{odd:.2f}* na [{bookmaker}]({link})\n"
+        
+    return message
+
+# ===============================
+# FUNÇÕES DO BOT TELEGRAM
 # ===============================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Responde ao comando /start."""
-    await update.message.reply_text("🚀 Bot de Arbitragem está ONLINE via Polling!")
+    await update.message.reply_text("🚀 Bot de Arbitragem está ONLINE via Polling! Use /buscar_arbitragem para iniciar a busca.")
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Verifica o status do bot."""
     await update.message.reply_text("✅ O bot está funcionando corretamente!")
 
-async def buscar_arbitragem_simulada(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Simula uma busca de arbitragem e envia um alerta."""
-    await update.message.reply_text("🔍 Buscando oportunidades de arbitragem (simulação)...")
-    await asyncio.sleep(2) # Simula um delay na busca
-    
-    # Exemplo de oportunidade simulada
-    oportunidade_simulada = (
-        "💰 Arbitragem Encontrada! (Simulado)\n\n"
-        "⚽️ Jogo: Time da Casa vs Time Visitante\n"
-        "📈 Lucro Estimado: 3.5% (Simulado)\n\n"
-        "🔹 Onde Apostar:\n"
-        "🏠 Mandante: 2.10 na [Bet365](https://www.bet365.com/)\n"
-        "🤝 Empate: 3.20 na [1xBet](https://1xbet.com/)\n"
-        "🏃 Visitante: 3.50 na [Pinnacle](https://www.pinnacle.com/)\n\n"
-        "Dica: Aposte R$100 para um lucro de R$3.50."
-    )
-    await update.message.reply_text(oportunidade_simulada, parse_mode='Markdown', disable_web_page_preview=True)
+async def buscar_arbitragem_real(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando para iniciar a busca real de arbitragem (manual)."""
+    await update.message.reply_text("🔍 Iniciando a busca por oportunidades de arbitragem em tempo real... aguarde por alertas!")
+    await find_and_alert_arbitrage(context.application) # Chama a função de busca
 
+# ===============================
+# LÓGICA PRINCIPAL DE BUSCA DE ARBITRAGEM
+# ===============================
+async def find_and_alert_arbitrage(app_bot: Application):
+    """
+    Busca por oportunidades de arbitragem na The Odds API e envia alertas.
+    Esta função será chamada periodicamente ou por comando.
+    """
+    url = f"https://api.the-odds-api.com/v4/sports/{SPORT}/odds/?apiKey={API_KEY}&regions={REGION}&markets={MARKETS}&oddsFormat=decimal"
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status() # Lança um erro para status de resposta HTTP ruins (4xx ou 5xx)
+        data = response.json()
+        
+        print(f"🎯 Analisando {len(data)} jogos para arbitragem...")
+
+        if not data:
+            print("Nenhum jogo encontrado ou API retornou vazio.")
+            if CHAT_ID: # Envia um aviso ao usuário se não encontrar jogos na primeira tentativa
+                await app_bot.bot.send_message(chat_id=CHAT_ID, text="ℹ️ Nenhuma oportunidade encontrada no momento. Continuarei monitorando.")
+            return
+
+        for game in data:
+            game_id_unique = f"{game['id']}-{game['commence_time']}" # ID único para o jogo
+            
+            if game_id_unique in alerted_opportunities:
+                continue # Já alertamos sobre este jogo
+
+            best_odds_for_outcomes = {} # {'home': {'odd': X, 'bookmaker': Y}, 'draw': ..., 'away': ...}
+
+            # Encontra as melhores odds para 'home', 'draw' e 'away'
+            for bookmaker_data in game['bookmakers']:
+                bookmaker_name = bookmaker_data['title']
+                
+                # Opcional: Filtrar por um número limitado de casas ou por casas específicas
+                # if bookmaker_name not in BOOKMAKERS_LINKS:
+                #     continue
+
+                for market in bookmaker_data['markets']:
+                    if market['key'] == MARKETS: # Apenas o mercado h2h
+                        for outcome in market['outcomes']:
+                            outcome_name = outcome['name'].lower() # 'home', 'draw', 'away'
+                            outcome_price = outcome['price']
+
+                            if outcome_name not in best_odds_for_outcomes or outcome_price > best_odds_for_outcomes[outcome_name]['odd']:
+                                best_odds_for_outcomes[outcome_name] = {
+                                    'odd': outcome_price,
+                                    'bookmaker': bookmaker_name
+                                }
+            
+            # Verifica se temos odds para todos os 3 resultados (home, draw, away)
+            if len(best_odds_for_outcomes) == 3 and all(key in best_odds_for_outcomes for key in ['home', 'draw', 'away']):
+                
+                odds_list = [best_odds_for_outcomes['home']['odd'], 
+                             best_odds_for_outcomes['draw']['odd'], 
+                             best_odds_for_outcomes['away']['odd']]
+                
+                profit = calculate_arbitrage_profit(odds_list)
+
+                if profit >= MIN_PROFIT_PERCENT:
+                    message = format_arbitrage_message(game, best_odds_for_outcomes, profit)
+                    
+                    if CHAT_ID:
+                        await app_bot.bot.send_message(chat_id=CHAT_ID, text=message, parse_mode='Markdown', disable_web_page_preview=True)
+                        alerted_opportunities.add(game_id_unique) # Adiciona ao cache
+                        print(f"✅ Alerta de arbitragem enviado! Lucro: {profit:.2f}%")
+                    else:
+                        print(f"Alerta de arbitragem encontrado, mas CHAT_ID não configurado. Lucro: {profit:.2f}%")
+                else:
+                    print(f"Oportunidade de arbitragem encontrada, mas lucro ({profit:.2f}%) abaixo do mínimo ({MIN_PROFIT_PERCENT}%)")
+            else:
+                print(f"Não há odds completas (home/draw/away) para o jogo {game.get('home_team')} vs {game.get('away_team')}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Erro na requisição à API de Odds: {e}")
+        # Pode ser erro de conexão, timeout, etc.
+    except Exception as e:
+        print(f"❌ Erro inesperado na busca de arbitragem: {e}")
+    finally:
+        # A busca será acionada por comando, não em loop infinito aqui.
+        # Se você quiser que ela rode em loop, teria que criar uma tarefa asyncio separada.
+        pass
 
 # ===============================
 # INICIALIZANDO O BOT (Polling)
@@ -53,11 +205,12 @@ def main():
     # Adiciona os handlers para os comandos
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
-    application.add_handler(CommandHandler("buscar_simulado", buscar_arbitragem_simulada)) # Novo comando para simulação
+    application.add_handler(CommandHandler("buscar_arbitragem", buscar_arbitragem_real)) # Comando para buscar REAL
 
     print("🚀 Bot rodando via Polling no Railway!")
     # Inicia o modo polling (o bot escuta por atualizações do Telegram)
-    application.run_polling(poll_interval=1.0) # Verifica a cada 1 segundo por novas mensagens
+    # poll_interval = 60 segundos por padrão para não estourar a cota da API de testes
+    application.run_polling(poll_interval=60.0) 
 
 if __name__ == '__main__':
     main()
