@@ -170,7 +170,7 @@ async def find_and_alert_arbitrage_loop(app_bot: Application):
 # ===============================
 # INICIALIZANDO O BOT (Polling)
 # ===============================
-async def main_bot_runner():
+async def main():
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
@@ -183,6 +183,6 @@ async def main_bot_runner():
     await application.run_polling(poll_interval=1.0) 
 
 if __name__ == '__main__':
-    # O Railway já inicia um loop de eventos principal para o processo.
-    # Chamamos a função diretamente para que ela rode dentro desse loop.
-    asyncio.run(main_bot_runner()) # Correção aplicada aqui
+    # Aqui é a correção final: não usamos asyncio.run() fora de uma função assíncrona,
+    # apenas chamamos a função principal diretamente. O Railway se encarrega do loop de eventos.
+    main()
