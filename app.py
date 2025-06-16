@@ -4,21 +4,21 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 import os
 import asyncio
 import time
-import threading # Vamos usar threading para a busca em background
+import threading 
 
 # ===============================
 # CONFIGURAÇÕES DO BOT
 # ===============================
 TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-API_KEY = os.getenv("ODDS_API_KEY") # Não usado na simulação
+API_KEY = os.getenv("ODDS_API_KEY") 
 
 SPORT = 'soccer'
 REGION = 'us,eu,uk,au'
 MARKETS = 'h2h'
 BOOKMAKERS_LIMIT = 5
 MIN_PROFIT_PERCENT = 1.0
-SEARCH_INTERVAL_SECONDS = 1800 # 30 minutos
+SEARCH_INTERVAL_SECONDS = 1800 
 
 BOOKMAKERS_LINKS = {
     'Bet365': 'https://www.bet365.com/',
@@ -106,11 +106,9 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ O bot está funcionando corretamente e buscando oportunidades a cada {SEARCH_INTERVAL_SECONDS / 60:.0f} minutos (Simulação).")
 
 # ===============================
-# LÓGICA PRINCIPAL DE BUSCA DE ARBITRAGEM (SIMULADA INTERNAMENTE - AGORA COM THREADING)
+# LÓGICA PRINCIPAL DE BUSCA DE ARBITRAGEM (SIMULADA INTERNAMENTE - COM THREADING)
 # ===============================
 def find_and_alert_arbitrage_loop_simulated_threaded():
-    """Função que roda a busca simulada em uma thread separada."""
-    # Criamos um novo loop de eventos para esta thread
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -140,15 +138,13 @@ def find_and_alert_arbitrage_loop_simulated_threaded():
             
             if game_id_unique in alerted_opportunities:
                 print("Oportunidade simulada já alertada. Pulando.")
-                time.sleep(SEARCH_INTERVAL_SECONDS) # time.sleep para threading
+                time.sleep(SEARCH_INTERVAL_SECONDS) 
                 continue 
             
             if profit_simulado >= MIN_PROFIT_PERCENT:
                 message = format_arbitrage_message(game_simulado, best_odds_info_simulado, profit_simulado)
                 
                 if CHAT_ID:
-                    # Usamos application.bot.send_message. É assíncrono, então precisa ser awaited.
-                    # Mas estamos em uma thread, então precisamos do loop da thread.
                     loop.run_until_complete(application.bot.send_message(chat_id=CHAT_ID, text=message, parse_mode='Markdown', disable_web_page_preview=True))
                     alerted_opportunities.add(game_id_unique)
                     print(f"✅ Alerta de arbitragem SIMULADA enviado! Lucro: {profit_simulado:.2f}%")
@@ -160,7 +156,7 @@ def find_and_alert_arbitrage_loop_simulated_threaded():
         except Exception as e:
             print(f"❌ Erro inesperado na busca de arbitragem (SIMULAÇÃO): {e}")
         
-        time.sleep(SEARCH_INTERVAL_SECONDS) # time.sleep para threading
+        time.sleep(SEARCH_INTERVAL_SECONDS) 
 
 # ===============================
 # ROTAS DO FLASK PARA O WEBHOOK E TESTE
@@ -172,7 +168,7 @@ async def webhook():
     """Rota que o Telegram envia as atualizações."""
     if request.method == "POST":
         update = Update.de_json(request.get_json(force=True), bot)
-        await application.process_update(update) # Processa a atualização do Telegram
+        await application.process_update(update) 
         return "ok"
     return "Webhook running!"
 
@@ -191,18 +187,17 @@ application.add_handler(CommandHandler("status", status))
 if __name__ == '__main__':
     print("🚀 Iniciando aplicação Railway (Webhook com Threading) FINAL...")
 
-    # Inicializa a aplicação do Telegram para processar os updates via webhook
-    # Esta linha é crucial para o run_webhook funcionar
-    asyncio.get_event_loop().run_until_complete(application.initialize())
-
-    # Inicia a busca simulada em uma thread separada.
-    # Esta thread terá seu próprio loop de eventos para as operações assíncronas de envio.
+    # Inicia a thread separada para a busca simulada.
     search_thread = threading.Thread(target=find_and_alert_arbitrage_loop_simulated_threaded)
-    search_thread.daemon = True # Permite que a thread principal encerre o programa se ela parar
+    search_thread.daemon = True 
     search_thread.start()
 
-    # Inicia o servidor Flask usando Application.run_webhook.
-    # Este método gerencia o servidor Flask e o loop de eventos para o bot.
+    # Inicializa a aplicação do Telegram (necessário para o processamento do webhook)
+    # Isso precisa ser feito APENAS UMA VEZ no início.
+    asyncio.get_event_loop().run_until_complete(application.initialize())
+
+    # Inicia o servidor Flask usando application.run_webhook.
+    # Este método é o ponto de entrada principal e gerencia o loop de eventos para o bot.
     application.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 8080)),
