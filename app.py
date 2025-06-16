@@ -49,7 +49,7 @@ BOOKMAKERS_LINKS = {
 
 alerted_opportunities = set()
 
-# Instância global do Bot e Application (sem inicializar aqui)
+# Instância global do Bot e Application
 bot = Bot(token=TOKEN)
 application = Application.builder().token(TOKEN).build()
 
@@ -177,27 +177,31 @@ def home():
 # ===============================
 # PONTO DE ENTRADA PRINCIPAL PARA O RAILWAY
 # = =============================
-# Handlers do bot (registrados uma vez na inicialização)
+# Inicia os handlers do bot
 application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("status", status))
 
-# Inicia a busca de arbitragem simulada em uma tarefa assíncrona em background
-# Isso deve ser feito assim que o loop de eventos principal estiver rodando
-asyncio.create_task(find_and_alert_arbitrage_loop_simulated())
+# ====================================================================
+# NOVO PONTO DE ENTRADA PRINCIPAL:
+# Rodamos o servidor Flask e, a partir do seu loop, iniciamos as tarefas do bot.
+# ====================================================================
+async def init_webhook_and_tasks():
+    """Função assíncrona que inicializa o Application e as tarefas de background."""
+    await application.initialize() # Inicializa o Application
+    asyncio.create_task(find_and_alert_arbitrage_loop_simulated()) # Cria a tarefa de busca simulada
 
-# Ponto de entrada que o Railway espera para uma aplicação Flask/Webhook
-# Esta é a forma mais direta de rodar o Flask e o bot juntos no Railway
+    # Aqui não chamamos run_webhook. O Flask que fará isso de forma integrada.
+
 if __name__ == '__main__':
     print("🚀 Iniciando aplicação Railway (Webhook) FINAL...")
-    # Inicializa a aplicação do Telegram para processar os updates via webhook
-    # Esta linha é crucial para o run_webhook funcionar
-    asyncio.get_event_loop().run_until_complete(application.initialize())
 
-    # Inicia o servidor Flask para escutar o webhook
-    # application.run_webhook já gerencia o Flask e o loop de eventos do bot
-    # Isso é o ponto de entrada principal e bloqueante.
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 8080)),
-        url_path="/webhook"
-    )
+    # A tarefa de inicialização e de background são agendadas para o loop de eventos do Flask.
+    # `app_flask.run()` inicia o servidor Flask e também inicia o loop de eventos.
+    # O `Application.run_webhook` será chamado internamente pelo Flask quando receber um webhook.
+
+    # Adiciona a tarefa de inicialização e busca ao loop de eventos do Flask
+    app_flask.before_first_request(lambda: asyncio.run(init_webhook_and_tasks()))
+
+    # Inicia o servidor Flask. Esta é a linha de execução principal.
+    # O `port` vem das variáveis de ambiente do Railway.
+    app_flask.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
